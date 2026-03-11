@@ -185,6 +185,7 @@ const sisterEmojiMap = {
 
 function detectSisterFromText(msg){
 const lower = msg.toLowerCase();
+
 if(lower.includes("flower")) currentSister = "flower";
 else if(lower.includes("knife")) currentSister = "knife";
 else if(lower.includes("candle")) currentSister = "candle";
@@ -303,6 +304,7 @@ let cleaned = msg
 .trim();
 
 const hasP = /<\s*p[\s>]/i.test(cleaned);
+
 if (!hasP) {
 const parts = cleaned
 .split(/\n{2,}/)
@@ -316,7 +318,8 @@ const escaped = p
 .replace(/>/g, "&gt;");
 return `<p>${escaped}</p>`;
 }).join('');
-} else {
+} 
+else {
 cleaned = cleaned.replace(/\n+/g, '');
 }
 
@@ -354,13 +357,6 @@ console.log("Copy failed",e);
 
 function handleIncomingMessage(event) {
 let data = event.data;
-  
-const rawString = String(event.data).toLowerCase();
-
-if (rawString.includes('"sister":"flower"')) currentSister = "flower";
-else if (rawString.includes('"sister":"knife"')) currentSister = "knife";
-else if (rawString.includes('"sister":"candle"')) currentSister = "candle";
-else if (rawString.includes('"sister":"mirror"')) currentSister = "mirror";
 
 if (typeof data === 'string') {
 
@@ -368,6 +364,7 @@ const raw = data;
 const trimmed = raw.trim();
 
 const cmd = stripOuterQuotesIfAny(trimmed).trim().toLowerCase();
+
 if (cmd === 'loading') { showLoading(); return; }
 if (cmd === 'reset') { resetOracle(); return; }
 
@@ -384,14 +381,12 @@ if (data && typeof data === 'object') {
 
 if (data.type === "listeningStatus" && data.sister) {
 const key = String(data.sister).toLowerCase();
-currentSister = key;
 setListeningMessage(firstListenLines[key] || "Sister is listening...");
 return;
 }
 
 if (data.type === "listeningStatusNext" && data.sister) {
 const key = String(data.sister).toLowerCase();
-currentSister = key;
 setListeningMessage(followupListenLines[key] || "Sister is listening...");
 return;
 }
