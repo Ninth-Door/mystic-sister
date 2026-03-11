@@ -147,14 +147,12 @@ body.has-response #response {
 <div id="copy-container">
 <button id="copy-btn">
 
-<!-- COPY ICON -->
 <svg id="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
 </svg>
 
-<!-- CHECK ICON -->
 <svg id="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
 style="display:none;">
@@ -180,6 +178,16 @@ const copyContainer = document.getElementById("copy-container");
 const copyBtn = document.getElementById("copy-btn");
 const copyIcon = document.getElementById("copy-icon");
 const checkIcon = document.getElementById("check-icon");
+
+/* NEW — remember current sister */
+let currentSister = null;
+
+const emojiMap = {
+flower:"🌷",
+knife:"🔪",
+candle:"🕯️",
+mirror:"🪞"
+};
 
 const ritualLines = [
 "Sister has heard you…",
@@ -306,7 +314,13 @@ copyBtn.addEventListener("click", async () => {
 
 try{
 
-await navigator.clipboard.writeText(responseEl.innerText);
+const emoji = emojiMap[currentSister] || "🌙";
+
+const header = `${emoji} Mystic Sister said…\n\n`;
+
+const textToCopy = header + responseEl.innerText;
+
+await navigator.clipboard.writeText(textToCopy);
 
 copyIcon.style.display="none";
 checkIcon.style.display="block";
@@ -344,14 +358,17 @@ return;
 }
 
 if (data && typeof data === 'object') {
+
 if (data.type === "listeningStatus" && data.sister) {
 const key = String(data.sister).toLowerCase();
+currentSister = key;
 setListeningMessage(firstListenLines[key] || "Sister is listening...");
 return;
 }
 
 if (data.type === "listeningStatusNext" && data.sister) {
 const key = String(data.sister).toLowerCase();
+currentSister = key;
 setListeningMessage(followupListenLines[key] || "Sister is listening...");
 return;
 }
