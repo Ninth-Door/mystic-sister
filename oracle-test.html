@@ -176,6 +176,17 @@ const copyBtn = document.getElementById("copy-btn");
 const copyIcon = document.getElementById("copy-icon");
 const checkIcon = document.getElementById("check-icon");
 
+/* STORE CURRENT SISTER */
+
+let currentSister = null;
+
+const sisterEmojiMap = {
+  flower: "🌷",
+  knife: "🔪",
+  candle: "🕯️",
+  mirror: "🪞"
+};
+
 const ritualLines = [
 "Sister has heard you…",
 "Don’t leave the room…",
@@ -318,7 +329,14 @@ resetOracle();
 copyBtn.addEventListener("click", async () => {
 
 try{
-await navigator.clipboard.writeText(responseEl.innerText);
+
+const emoji = sisterEmojiMap[currentSister] || "🌙";
+
+const finalCopy =
+emoji + " Mystic Sister said…\n\n" +
+responseEl.innerText;
+
+await navigator.clipboard.writeText(finalCopy);
 
 copyIcon.style.display="none";
 checkIcon.style.display="block";
@@ -363,12 +381,14 @@ return;
 if (data && typeof data === 'object') {
 if (data.type === "listeningStatus" && data.sister) {
 const key = String(data.sister).toLowerCase();
+currentSister = key;
 setListeningMessage(firstListenLines[key] || "Sister is listening...");
 return;
 }
 
 if (data.type === "listeningStatusNext" && data.sister) {
 const key = String(data.sister).toLowerCase();
+currentSister = key;
 setListeningMessage(followupListenLines[key] || "Sister is listening...");
 return;
 }
