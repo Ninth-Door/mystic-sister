@@ -10,6 +10,8 @@
   font-family: 'RotundaVeneta';
   src: url('fonts/RotundaVeneta.woff2') format('woff2'),
        url('fonts/RotundaVeneta.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
 }
 
 .rotunda {
@@ -88,6 +90,7 @@ body.has-response #loading {
   margin-left: auto;
   margin-right: auto;
   text-align: left;
+  white-space: normal;
   animation: fadeIn 300ms ease-in;
 }
 
@@ -103,6 +106,8 @@ body.has-response #loading {
 body.has-response #response {
   margin-top: 0;
 }
+
+/* COPY BUTTON */
 
 #copy-container {
   display:none;
@@ -131,7 +136,7 @@ body.has-response #response {
   <div id="listening" class="rotunda">Sister is listening...</div>
 
   <div id="loading">
-    <img src="https://ninth-door.github.io/mystic-sister/assets/loading.gif?v=4">
+    <img src="https://ninth-door.github.io/mystic-sister/assets/loading.gif?v=4" alt="Loading..." />
     <div id="loading-text" class="rotunda"></div>
   </div>
 </div>
@@ -158,21 +163,21 @@ body.has-response #response {
 <script>
 
 const preloadGIF = new Image();
-preloadGIF.src="https://ninth-door.github.io/mystic-sister/assets/loading.gif?v=4";
+preloadGIF.src = "https://ninth-door.github.io/mystic-sister/assets/loading.gif?v=4";
 
-const listeningEl=document.getElementById('listening');
-const loadingEl=document.getElementById('loading');
-const responseEl=document.getElementById('response');
-const loadingTextEl=document.getElementById('loading-text');
+const listeningEl = document.getElementById('listening');
+const loadingEl = document.getElementById('loading');
+const responseEl = document.getElementById('response');
+const loadingTextEl = document.getElementById('loading-text');
 
-const copyContainer=document.getElementById("copy-container");
-const copyBtn=document.getElementById("copy-btn");
-const copyIcon=document.getElementById("copy-icon");
-const checkIcon=document.getElementById("check-icon");
+const copyContainer = document.getElementById("copy-container");
+const copyBtn = document.getElementById("copy-btn");
+const copyIcon = document.getElementById("copy-icon");
+const checkIcon = document.getElementById("check-icon");
 
-let currentSister=null;
+let currentSister = null;
 
-const sisterEmojiMap={
+const sisterEmojiMap = {
 flower:"🌷",
 knife:"🔪",
 candle:"🕯️",
@@ -180,15 +185,14 @@ mirror:"🪞"
 };
 
 function captureSister(){
-const txt=listeningEl.innerText.toLowerCase();
-
+const txt = listeningEl.innerText.toLowerCase();
 if(txt.includes("flower")) currentSister="flower";
 else if(txt.includes("knife")) currentSister="knife";
 else if(txt.includes("candle")) currentSister="candle";
 else if(txt.includes("mirror")) currentSister="mirror";
 }
 
-const ritualLines=[
+const ritualLines = [
 "Sister has heard you…",
 "Don’t leave the room…",
 "Tuning into your story…",
@@ -197,31 +201,31 @@ const ritualLines=[
 "One more moment…"
 ];
 
-let ritualIndex=0;
-let ritualInterval=null;
+let ritualIndex = 0;
+let ritualInterval = null;
 
 function startRitualText(){
 stopRitualText();
-ritualIndex=0;
+ritualIndex = 0;
 loadingTextEl.classList.remove('pulse');
-loadingTextEl.innerText=ritualLines[0];
-loadingTextEl.style.opacity=1;
+loadingTextEl.innerText = ritualLines[0];
+loadingTextEl.style.opacity = 1;
 
-ritualInterval=setInterval(()=>{
-if(ritualIndex>=ritualLines.length-1){
+ritualInterval = setInterval(()=>{
+if(ritualIndex >= ritualLines.length - 1){
 clearInterval(ritualInterval);
-ritualInterval=null;
+ritualInterval = null;
 loadingTextEl.classList.add('pulse');
 return;
 }
 
-loadingTextEl.style.opacity=0;
+loadingTextEl.style.opacity = 0;
 loadingTextEl.classList.remove('pulse');
 
 setTimeout(()=>{
 ritualIndex++;
-loadingTextEl.innerText=ritualLines[ritualIndex];
-loadingTextEl.style.opacity=1;
+loadingTextEl.innerText = ritualLines[ritualIndex];
+loadingTextEl.style.opacity = 1;
 },600);
 
 },4800);
@@ -230,13 +234,13 @@ loadingTextEl.style.opacity=1;
 function stopRitualText(){
 if(ritualInterval){
 clearInterval(ritualInterval);
-ritualInterval=null;
+ritualInterval = null;
 }
 loadingTextEl.classList.remove('pulse');
-loadingTextEl.style.opacity=0;
+loadingTextEl.style.opacity = 0;
 }
 
-const firstListenLines={
+const firstListenLines = {
 flower:"Flower is listening...",
 candle:"Candle is listening...",
 knife:"Knife is listening...",
@@ -244,9 +248,8 @@ mirror:"Mirror is listening..."
 };
 
 function setListeningMessage(msg){
-
 document.body.classList.remove('has-response');
-listeningEl.innerHTML=msg;
+listeningEl.innerHTML = msg;
 
 captureSister();
 
@@ -274,6 +277,15 @@ responseEl.innerHTML='';
 copyContainer.style.display="none";
 }
 
+function stripOuterQuotesIfAny(s){
+const t = s.trim();
+if((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))){
+try { return JSON.parse(t); }
+catch(e){ return t.slice(1,-1); }
+}
+return s;
+}
+
 function showResponse(msg){
 
 document.body.classList.add('has-response');
@@ -282,12 +294,34 @@ loadingEl.classList.remove('is-visible');
 stopRitualText();
 responseEl.style.display='block';
 
-let cleaned=String(msg)
+msg = stripOuterQuotesIfAny(String(msg ?? ''));
+msg = String(msg)
+.replace(/\\n/g,'\n')
+.replace(/\\"/g,'"');
+
+let cleaned = msg
 .replace(/<\/?html>/gi,'')
 .replace(/<\/?body.*?>/gi,'')
 .trim();
 
-responseEl.innerHTML=cleaned;
+const hasP = /<\s*p[\s>]/i.test(cleaned);
+
+if(!hasP){
+const parts = cleaned.split(/\n{2,}/).map(s=>s.trim()).filter(Boolean);
+
+cleaned = parts.map(p=>{
+const escaped = p
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;");
+return `<p>${escaped}</p>`;
+}).join('');
+}
+else{
+cleaned = cleaned.replace(/\n+/g,'');
+}
+
+responseEl.innerHTML = cleaned;
 
 copyContainer.style.display="block";
 }
@@ -298,9 +332,9 @@ copyBtn.addEventListener("click",async()=>{
 
 try{
 
-const emoji=sisterEmojiMap[currentSister]||"🌙";
+const emoji = sisterEmojiMap[currentSister] || "🌙";
 
-const finalCopy=
+const finalCopy =
 emoji+" Mystic Sister said…\n\n"+
 responseEl.innerText;
 
@@ -322,28 +356,39 @@ console.log("Copy failed",e);
 
 function handleIncomingMessage(event){
 
-let data=event.data;
+let data = event.data;
 
-if(typeof data==='string'){
+if(typeof data === 'string'){
 
-const raw=data.trim().toLowerCase();
+const raw = data;
+const trimmed = raw.trim();
 
-if(raw==='loading'){showLoading();return;}
-if(raw==='reset'){resetOracle();return;}
+const cmd = stripOuterQuotesIfAny(trimmed).trim().toLowerCase();
+if(cmd === 'loading'){ showLoading(); return; }
+if(cmd === 'reset'){ resetOracle(); return; }
 
-showResponse(data);
+if(trimmed.startsWith('{') && trimmed.endsWith('}')){
+try{ data = JSON.parse(trimmed); }
+catch(e){ showResponse(raw); return; }
+}
+else{
+showResponse(raw);
 return;
 }
 
-if(data && typeof data==='object'){
+}
+
+if(data && typeof data === 'object'){
 
 if(data.type==="listeningStatus" && data.sister){
-const key=String(data.sister).toLowerCase();
-setListeningMessage(firstListenLines[key]||"Sister is listening...");
+const key = String(data.sister).toLowerCase();
+setListeningMessage(firstListenLines[key] || "Sister is listening...");
 return;
 }
 
 }
+
+showResponse(String(data ?? ''));
 
 }
 
