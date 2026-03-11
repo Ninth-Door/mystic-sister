@@ -354,6 +354,13 @@ console.log("Copy failed",e);
 
 function handleIncomingMessage(event) {
 let data = event.data;
+  
+const rawString = String(event.data).toLowerCase();
+
+if (rawString.includes('"sister":"flower"')) currentSister = "flower";
+else if (rawString.includes('"sister":"knife"')) currentSister = "knife";
+else if (rawString.includes('"sister":"candle"')) currentSister = "candle";
+else if (rawString.includes('"sister":"mirror"')) currentSister = "mirror";
 
 if (typeof data === 'string') {
 
