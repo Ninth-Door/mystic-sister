@@ -336,7 +336,7 @@ const emoji = sisterEmojiMap[currentSister] || "🌙";
 
 const finalCopy =
 emoji+" Mystic Sister said…\n\n"+
-responseEl.innerText;
+responseEl.innerText.trimEnd();
 
 await navigator.clipboard.writeText(finalCopy);
 
