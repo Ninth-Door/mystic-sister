@@ -184,6 +184,11 @@ candle:"🕯️",
 mirror:"🪞"
 };
 
+function setCurrentSister(sister){
+const key = String(sister || '').toLowerCase().trim();
+if(sisterEmojiMap[key]) currentSister = key;
+}
+
 function captureSister(){
 const txt = listeningEl.innerText.toLowerCase();
 if(txt.includes("flower")) currentSister="flower";
@@ -336,7 +341,7 @@ const emoji = sisterEmojiMap[currentSister] || "🌙";
 
 const finalCopy =
 emoji+" Mystic Sister said…\n\n"+
-responseEl.innerText;
+responseEl.innerText.trimEnd();
 
 await navigator.clipboard.writeText(finalCopy);
 
@@ -380,8 +385,14 @@ return;
 
 if(data && typeof data === 'object'){
 
+if(data.type==="setSister" && data.sister){
+setCurrentSister(data.sister);
+return;
+}
+
 if(data.type==="listeningStatus" && data.sister){
 const key = String(data.sister).toLowerCase();
+setCurrentSister(key);
 setListeningMessage(firstListenLines[key] || "Sister is listening...");
 return;
 }
