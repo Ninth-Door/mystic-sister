@@ -203,6 +203,7 @@
 
     let currentSister = null;
     let readingViewedSent = false;
+    let isLoadingActive = false;
 
     const viewedScrollThreshold = 0.85;
     const autoViewedMaxScrollablePx = 120;
@@ -365,6 +366,7 @@
 
       captureSister();
       resetReadingViewedState();
+      isLoadingActive = false;
 
       listeningEl.style.display = 'block';
       loadingEl.classList.remove('is-visible');
@@ -382,8 +384,11 @@
     }
 
     function showLoading() {
+      if (isLoadingActive && loadingEl.classList.contains('is-visible')) return;
+
       document.body.classList.remove('has-response');
       resetReadingViewedState();
+      isLoadingActive = true;
 
       listeningEl.style.display = 'none';
       loadingEl.classList.remove('is-visible');
@@ -420,6 +425,7 @@
     function showResponse(msg) {
       document.body.classList.add('has-response');
       resetReadingViewedState();
+      isLoadingActive = false;
 
       listeningEl.style.display = 'none';
       loadingEl.classList.remove('is-visible');
