@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mystic Sister Reading Log</title>
+  <script
+    src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js"
+    type="text/javascript"
+  ></script>
+
+  <style>
+    @font-face {
+      font-family: 'RotundaVeneta';
+      src: url('fonts/RotundaVeneta.woff2') format('woff2'),
+           url('fonts/RotundaVeneta.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    .rotunda {
+      font-family: 'RotundaVeneta', 'Georgia', serif;
+      letter-spacing: 0.5px;
+    }
+
+    body {
+      background-color: #FFFBF5;
+      color: #000;
+      font-family: 'Georgia', serif;
+      line-height: 1.55;
+      margin: 0;
+      padding: 20px;
+      text-align: left;
+      overflow-x: hidden;
+    }
+
+    #top-center {
+      padding-top: 60px;
+      text-align: center;
+    }
+
+    /* Default state for the log: a quiet, on-brand placeholder that is
+       correct the instant the page paints. No "Sister is listening..."
+       flash, because that string never exists in this file. */
+    #listening {
+      font-size: 1.6em;
+      font-family: 'RotundaVeneta', 'Georgia', serif;
+    }
+
+    #response {
+      display: none;
+      margin-top: 8px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+      white-space: normal;
+      animation: fadeIn 300ms ease-in;
+    }
+
+    #response p {
+      margin: 0.8em 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    body.has-response #response {
+      margin-top: 0;
+    }
+
+    /* COPY BUTTON */
+
+    #copy-container {
+      display: none;
+      text-align: center;
+      margin-top: 2em;
+    }
+
+    #copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      color: inherit;
+    }
+
+    #copy-btn svg {
+      width: 22px;
+      height: 22px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="top-center">
+    <div id="listening" class="rotunda">Turning back the pages...</div>
+  </div>
+
+  <div id="response"></div>
+
+  <div id="copy-container">
+    <button id="copy-btn">
+      <svg
+        id="copy-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <rect width="14" height="14" x="8" y="8" rx="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+      </svg>
+
+      <svg
+        id="check-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        style="display: none;"
+      >
+        <path d="m12 15 2 2 4-4" />
+        <rect width="14" height="14" x="8" y="8" rx="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+      </svg>
+    </button>
+  </div>
+
+  <script>
+    const listeningEl = document.getElementById('listening');
+    const responseEl = document.getElementById('response');
+
+    const copyContainer = document.getElementById('copy-container');
+    const copyBtn = document.getElementById('copy-btn');
+    const copyIcon = document.getElementById('copy-icon');
+    const checkIcon = document.getElementById('check-icon');
+
+    let currentSister = null;
+
+    const sisterEmojiMap = {
+      flower: '🌷',
+      knife: '🔪',
+      candle: '🕯️',
+      mirror: '🪞'
+    };
+
+    function setCurrentSister(sister) {
+      const key = String(sister || '').toLowerCase().trim();
+      if (sisterEmojiMap[key]) currentSister = key;
+    }
+
+    function postThunkableMessage(message) {
+      try {
+        if (
+          window.ThunkableWebviewerExtension &&
+          typeof window.ThunkableWebviewerExtension.postMessage === 'function'
+        ) {
+          window.ThunkableWebviewerExtension.postMessage(message);
+        }
+      } catch (e) {
+        console.log('Thunkable postMessage failed', e);
+      }
+    }
+
+    function stripOuterQuotesIfAny(s) {
+      const t = s.trim();
+
+      if (
+        (t.startsWith('"') && t.endsWith('"')) ||
+        (t.startsWith("'") && t.endsWith("'"))
+      ) {
+        try {
+          return JSON.parse(t);
+        } catch (e) {
+          return t.slice(1, -1);
+        }
+      }
+
+      return s;
+    }
+
+    // Reset back to the placeholder. Used between readings when the user
+    // taps Previous/Next, so the old reading never lingers under the new one.
+    function resetLog() {
+      document.body.classList.remove('has-response');
+      listeningEl.style.display = 'block';
+      responseEl.style.display = 'none';
+      responseEl.innerHTML = '';
+      copyContainer.style.display = 'none';
+    }
+
+    function showResponse(msg) {
+      document.body.classList.add('has-response');
+
+      listeningEl.style.display = 'none';
+      responseEl.style.display = 'block';
+
+      msg = stripOuterQuotesIfAny(String(msg ?? ''));
+      msg = String(msg)
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"');
+
+      let cleaned = msg
+        .replace(/<\/?html>/gi, '')
+        .replace(/<\/?body.*?>/gi, '')
+        .trim();
+
+      const hasP = /<\s*p[\s>]/i.test(cleaned);
+
+      if (!hasP) {
+        const parts = cleaned
+          .split(/\n{2,}/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        cleaned = parts
+          .map((p) => {
+            const escaped = p
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+
+            return `<p>${escaped}</p>`;
+          })
+          .join('');
+      } else {
+        cleaned = cleaned.replace(/\n+/g, '');
+      }
+
+      responseEl.innerHTML = cleaned;
+      copyContainer.style.display = 'block';
+
+      // Jump to the top so a newly opened reading always starts at its
+      // first line, even if the previous one was scrolled down.
+      window.scrollTo(0, 0);
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        const emoji = sisterEmojiMap[currentSister] || '🌙';
+
+        const finalCopy =
+          emoji + ' Mystic Sister said…\n\n' +
+          responseEl.innerText.trimEnd();
+
+        await navigator.clipboard.writeText(finalCopy);
+
+        copyIcon.style.display = 'none';
+        checkIcon.style.display = 'block';
+
+        setTimeout(() => {
+          checkIcon.style.display = 'none';
+          copyIcon.style.display = 'block';
+        }, 1500);
+      } catch (e) {
+        console.log('Copy failed', e);
+      }
+    });
+
+    function handleIncomingMessage(event) {
+      let data = event.data;
+
+      if (typeof data === 'string') {
+        const raw = data;
+        const trimmed = raw.trim();
+
+        const cmd = stripOuterQuotesIfAny(trimmed).trim().toLowerCase();
+
+        if (cmd === 'reset') {
+          resetLog();
+          return;
+        }
+
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            data = JSON.parse(trimmed);
+          } catch (e) {
+            showResponse(raw);
+            return;
+          }
+        } else {
+          showResponse(raw);
+          return;
+        }
+      }
+
+      if (data && typeof data === 'object') {
+        if (data.type === 'setSister' && data.sister) {
+          setCurrentSister(data.sister);
+          return;
+        }
+      }
+
+      showResponse(String(data ?? ''));
+    }
+
+    window.addEventListener('message', handleIncomingMessage);
+    document.addEventListener('message', handleIncomingMessage);
+
+    // Announce readiness LAST — only once the listeners above are attached.
+    // Thunkable waits for this before pushing the reading, which removes the
+    // cold-load race entirely (no more guessing with a fixed wait).
+    postThunkableMessage('webviewerReady');
+  </script>
+</body>
+</html>
