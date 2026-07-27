@@ -111,15 +111,25 @@
       margin-top: 0;
     }
 
-    /* COPY BUTTON */
+    /* ACTION ROW — share (left) + copy (right).
+       Flex-centred, so when the share button is absent (older app builds
+       that never send canShare) the copy button sits centred exactly as
+       it did before this feature existed. */
 
-    #copy-container {
+    #action-container {
       display: none;
-      text-align: center;
       margin-top: 2em;
+      justify-content: center;
+      align-items: center;
+      gap: 28px;
     }
 
-    #copy-btn {
+    #action-container.is-visible {
+      display: flex;
+    }
+
+    #copy-btn,
+    #share-btn {
       background: none;
       border: none;
       cursor: pointer;
@@ -127,9 +137,55 @@
       color: inherit;
     }
 
-    #copy-btn svg {
+    #copy-btn svg,
+    #share-btn svg {
       width: 22px;
       height: 22px;
+    }
+
+    /* Hidden until the app announces it can handle sharing. */
+    #share-btn {
+      display: none;
+    }
+
+    #share-btn.is-available {
+      display: inline-flex;
+    }
+
+    #action-container.is-busy #copy-btn,
+    #action-container.is-busy #share-btn {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    /* STATUS LINE — sits under both buttons. */
+
+    #share-status {
+      display: none;
+      margin-top: 12px;
+      text-align: center;
+      font-size: 1.05em;
+      line-height: 1.4;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    #share-status.is-visible {
+      display: block;
+      opacity: 1;
+    }
+
+    #share-status.is-working {
+      animation: statusPulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes statusPulse {
+      0%   { opacity: 0.45; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.45; }
     }
   </style>
 </head>
@@ -149,8 +205,26 @@
 
   <div id="response"></div>
 
-  <div id="copy-container">
-    <button id="copy-btn">
+  <div id="action-container">
+    <!-- SHARE -->
+    <button id="share-btn" aria-label="Share this reading">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+        <polyline points="16 6 12 2 8 6" />
+        <line x1="12" x2="12" y1="2" y2="15" />
+      </svg>
+    </button>
+
+    <!-- COPY -->
+    <button id="copy-btn" aria-label="Copy this reading">
       <svg
         id="copy-icon"
         xmlns="http://www.w3.org/2000/svg"
@@ -179,6 +253,8 @@
     </button>
   </div>
 
+  <div id="share-status" class="rotunda"></div>
+
   <script>
     const preloadGIF = new Image();
     preloadGIF.src = 'https://ninth-door.github.io/mystic-sister/assets/loading.gif?v=4';
@@ -188,14 +264,28 @@
     const responseEl = document.getElementById('response');
     const loadingTextEl = document.getElementById('loading-text');
 
-    const copyContainer = document.getElementById('copy-container');
+    const actionContainer = document.getElementById('action-container');
     const copyBtn = document.getElementById('copy-btn');
     const copyIcon = document.getElementById('copy-icon');
     const checkIcon = document.getElementById('check-icon');
+    const shareBtn = document.getElementById('share-btn');
+    const shareStatusEl = document.getElementById('share-status');
 
     let currentSister = null;
     let readingViewedSent = false;
     let isLoadingActive = false;
+
+    /* Sharing stays invisible until the app tells us it can handle it.
+       Older builds never send canShare, so on those the share button is
+       never shown and the copy button sits centred, exactly as it did
+       before this feature existed. */
+    let canShare = false;
+    let shareInFlight = false;
+    let shareTimeoutId = null;
+
+    const SHARE_TIMEOUT_MS = 30000;
+    const SHARE_WORKING_TEXT = 'Sister is writing you a postcard.';
+    const SHARE_SKIP_TEXT = 'Sister thinks this reading should stay between the two of you.';
 
     const viewedScrollThreshold = 0.85;
     const autoViewedMaxScrollablePx = 120;
@@ -292,6 +382,75 @@
       }
     }
 
+    /* ---------------- SHARE STATE ---------------- */
+
+    function enableSharing() {
+      canShare = true;
+      shareBtn.classList.add('is-available');
+    }
+
+    function clearShareStatus() {
+      shareStatusEl.classList.remove('is-visible', 'is-working');
+      shareStatusEl.textContent = '';
+    }
+
+    function showShareStatus(text, working) {
+      shareStatusEl.textContent = text;
+      shareStatusEl.classList.add('is-visible');
+      if (working) shareStatusEl.classList.add('is-working');
+      else shareStatusEl.classList.remove('is-working');
+    }
+
+    // Called whenever the reading on screen changes, so share state from a
+    // previous reading can never leak onto the next one.
+    function resetShareState() {
+      if (shareTimeoutId) {
+        clearTimeout(shareTimeoutId);
+        shareTimeoutId = null;
+      }
+      shareInFlight = false;
+      actionContainer.classList.remove('is-busy');
+      clearShareStatus();
+    }
+
+    function endShare(result) {
+      if (shareTimeoutId) {
+        clearTimeout(shareTimeoutId);
+        shareTimeoutId = null;
+      }
+
+      shareInFlight = false;
+      actionContainer.classList.remove('is-busy');
+
+      // "skip" is the only result that leaves a message on screen — it is
+      // Sister declining, and the user should see why nothing happened.
+      // "ok" means the share sheet is already open, so the page goes quiet.
+      // "error" is covered by the app's own alert.
+      if (result === 'skip') showShareStatus(SHARE_SKIP_TEXT, false);
+      else clearShareStatus();
+    }
+
+    /* Every path out of Thunkable posts shareDone, but a dropped message
+       would otherwise leave this pulsing forever. */
+    function beginShare() {
+      if (!canShare || shareInFlight) return;
+
+      shareInFlight = true;
+      actionContainer.classList.add('is-busy');
+      showShareStatus(SHARE_WORKING_TEXT, true);
+
+      shareTimeoutId = setTimeout(() => {
+        shareTimeoutId = null;
+        if (shareInFlight) endShare('error');
+      }, SHARE_TIMEOUT_MS);
+
+      postThunkableMessage('share');
+    }
+
+    shareBtn.addEventListener('click', beginShare);
+
+    /* ---------------- LOADING RITUAL ---------------- */
+
     const ritualLines = [
       'Sister has heard you…',
       'Don’t leave the room…',
@@ -360,7 +519,8 @@
       stopRitualText();
       responseEl.style.display = 'none';
       responseEl.innerHTML = '';
-      copyContainer.style.display = 'none';
+      actionContainer.classList.remove('is-visible');
+      resetShareState();
     }
 
     function resetOracle() {
@@ -381,7 +541,8 @@
       startRitualText();
       responseEl.style.display = 'none';
       responseEl.innerHTML = '';
-      copyContainer.style.display = 'none';
+      actionContainer.classList.remove('is-visible');
+      resetShareState();
     }
 
     function stripOuterQuotesIfAny(s) {
@@ -444,7 +605,10 @@
       }
 
       responseEl.innerHTML = cleaned;
-      copyContainer.style.display = 'block';
+
+      // New reading on screen -> any previous share state is stale.
+      resetShareState();
+      actionContainer.classList.add('is-visible');
 
       setTimeout(checkReadingViewed, 80);
     }
@@ -508,6 +672,10 @@
       }
 
       if (data && typeof data === 'object') {
+        // canShare rides along on setSister and listeningStatus. Accept
+        // boolean or string, since Thunkable can stringify object fields.
+        if (data.canShare === true || data.canShare === 'true') enableSharing();
+
         if (data.type === 'setSister' && data.sister) {
           setCurrentSister(data.sister);
           return;
@@ -519,6 +687,16 @@
           setListeningMessage(firstListenLines[key] || 'Sister is listening...');
           return;
         }
+
+        if (data.type === 'shareDone') {
+          endShare(String(data.result || 'error'));
+          return;
+        }
+
+        // Any other object is not for us. Returning here is deliberate:
+        // falling through would hand String({...}) to showResponse and
+        // paint "[object Object]" over the reading.
+        return;
       }
 
       showResponse(String(data ?? ''));
