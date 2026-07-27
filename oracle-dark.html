@@ -399,6 +399,15 @@
       shareStatusEl.classList.add('is-visible');
       if (working) shareStatusEl.classList.add('is-working');
       else shareStatusEl.classList.remove('is-working');
+
+      // The user taps share from the bottom of the reading, so this line
+      // appears just off-screen. Pull it into view rather than leaving them
+      // to discover it by scrolling.
+      try {
+        shareStatusEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      } catch (e) {
+        window.scrollTo(0, document.body.scrollHeight);
+      }
     }
 
     // Called whenever the reading on screen changes, so share state from a
