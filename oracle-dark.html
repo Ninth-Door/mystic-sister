@@ -713,6 +713,20 @@
 
     window.addEventListener('message', handleIncomingMessage);
     document.addEventListener('message', handleIncomingMessage);
+
+    /* Announce readiness LAST, once the listeners above are attached.
+
+       Submitting a question toggles the page's Scrollable property, which
+       makes Thunkable reload this WebViewer. On a slow device that reload
+       can outlast the app's timed "loading" post, so the message arrives
+       before anything is listening and the loading state never appears —
+       the user sits on "Sister is listening..." for the whole generation.
+
+       Posting this on load lets the app answer with current state: if a
+       reading is still pending it re-sends "loading", and showLoading()
+       ignores it when the loading state is already up. Older app builds
+       have no handler for this message and simply discard it. */
+    postThunkableMessage('webviewerReady');
   </script>
 </body>
 </html>
