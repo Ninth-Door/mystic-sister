@@ -693,28 +693,7 @@
         if (data.type === 'listeningStatus' && data.sister) {
           const key = String(data.sister).toLowerCase();
           setCurrentSister(key);
-          const line = firstListenLines[key] || 'Sister is listening...';
-
-          // Always keep the text current, so it is correct whenever it shows.
-          listeningEl.innerHTML = line;
-
-          /* Only take over the screen when nothing more important is on it.
-
-             setListeningMessage() resets the whole view — it hides the loading
-             GIF and stops the ritual text. That is right for a genuine reset,
-             but wrong for a name update: the app posts "loading" and
-             listeningStatus back to back on webviewerReady, so whichever
-             arrives second wins. On a slow device that was listeningStatus,
-             which silently cancelled the loading state the message before it
-             had just switched on — the reading generated normally but the
-             user only ever saw "Knife is listening...".
-
-             Gating on the current state instead of trusting message order also
-             stops a stray listeningStatus from wiping a reading already on
-             screen. */
-          if (!isLoadingActive && !document.body.classList.contains('has-response')) {
-            setListeningMessage(line);
-          }
+          setListeningMessage(firstListenLines[key] || 'Sister is listening...');
           return;
         }
 
