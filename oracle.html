@@ -571,7 +571,7 @@
       return s;
     }
 
-    function showResponse(msg) {
+    function showResponse(msg, hideActions) {
       document.body.classList.add('has-response');
       resetReadingViewedState();
       isLoadingActive = false;
@@ -617,7 +617,13 @@
 
       // New reading on screen -> any previous share state is stale.
       resetShareState();
-      actionContainer.classList.add('is-visible');
+
+      /* Promo and tier-limit messages come through here too, but they are not
+         readings — there is nothing to copy or share. They pass hideActions,
+         so the action row stays hidden for them. Every existing caller passes
+         one argument, so hideActions is undefined and the buttons show exactly
+         as before. */
+      if (!hideActions) actionContainer.classList.add('is-visible');
 
       setTimeout(checkReadingViewed, 80);
     }
@@ -715,6 +721,18 @@
           if (!isLoadingActive && !document.body.classList.contains('has-response')) {
             setListeningMessage(line);
           }
+          return;
+        }
+
+        /* Promo codes and weekly-limit notices arrive as a typed object rather
+           than a bare string, so the page can tell them apart from a reading.
+           Same renderer, same formatting — the only difference is that the
+           copy and share buttons stay hidden.
+
+           Older app builds still send these as a plain string, which takes the
+           reading path further down and behaves exactly as it always has. */
+        if (data.type === 'promoMessage') {
+          showResponse(String(data.text ?? ''), true);
           return;
         }
 
